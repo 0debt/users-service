@@ -1,4 +1,3 @@
-// src/utils/jwt.ts
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose'
 
 const secretKey = Bun.env.JWT_SECRET

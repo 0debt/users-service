@@ -1,4 +1,3 @@
-// src/middleware/auth.ts
 import type { MiddlewareHandler } from 'hono'
 import { verifyJwt } from '../utils/jwt'
 import type { AppEnv, JwtUserPayload } from '../types/app'
@@ -14,7 +13,6 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
 
   try {
     const payload = await verifyJwt<JwtUserPayload>(token)
-    // ahora TS sabe que 'user' es JwtUserPayload
     c.set('user', payload)
     await next()
   } catch (error) {

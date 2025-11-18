@@ -1,4 +1,3 @@
-// src/routes/auth.ts
 import { Hono } from 'hono'
 import { getUsersCollection } from '../db/mongo'
 import { signJwt } from '../utils/jwt'
@@ -32,7 +31,6 @@ authRoute.post('/register', async (c) => {
     return c.json({ error: 'Ese email ya está registrado' }, 409)
   }
 
-  // Hash de contraseña con Bun
   const passwordHash = await Bun.password.hash(password)
 
   const result = await users.insertOne({

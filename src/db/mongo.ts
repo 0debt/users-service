@@ -1,4 +1,3 @@
-// src/db/mongo.ts
 import { MongoClient, Db, Collection } from 'mongodb'
 
 const uri = Bun.env.MONGODB_URI

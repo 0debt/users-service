@@ -1,4 +1,3 @@
-// src/index.ts
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 import { cors } from 'hono/cors'
@@ -7,7 +6,6 @@ import { connectToDatabase } from './db/mongo'
 import { authRoute } from './routes/auth'
 import { usersRoute } from './routes/users'
 
-// Nos aseguramos de conectar a la BD antes de arrancar
 await connectToDatabase()
 
 const app = new Hono()
