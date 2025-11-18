@@ -1,77 +1,106 @@
-import { Hono } from 'hono'
+import { OpenAPIHono, z } from '@hono/zod-openapi'
 import { getUsersCollection } from '../db/mongo'
 import { signJwt } from '../utils/jwt'
 
-export const authRoute = new Hono()
+export const authRoute = new OpenAPIHono()
 
-type RegisterBody = {
-  email: string
-  password: string
-  name?: string
-}
+const RegisterSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+  name: z.string().optional()
+}).openapi('RegisterRequest')
 
-type LoginBody = {
-  email: string
-  password: string
-}
+const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string()
+}).openapi('LoginRequest')
 
-// POST /api/v1/auth/register
-authRoute.post('/register', async (c) => {
-  const body = await c.req.json<RegisterBody>()
-  const { email, password, name } = body
+const TokenResponse = z.object({
+  token: z.string()
+}).openapi('TokenResponse')
 
-  if (!email || !password) {
-    return c.json({ error: 'email y password son obligatorios' }, 400)
+// Register
+authRoute.openapi(
+  {
+    method: 'post',
+    path: '/register',
+    summary: 'Registrar nuevo usuario',
+    request: {
+      body: {
+        content: {
+          'application/json': { schema: RegisterSchema }
+        }
+      }
+    },
+    responses: {
+      201: { description: 'Usuario creado' },
+      409: { description: 'Email ya registrado' }
+    }
+  },
+  async (c) => {
+    const body = await c.req.json()
+    const { email, password, name } = body
+
+    const users = getUsersCollection()
+    const existing = await users.findOne({ email })
+    if (existing) {
+      return c.json({ error: 'Ese email ya está registrado' }, 409)
+    }
+
+    const passwordHash = await Bun.password.hash(password)
+
+    const result = await users.insertOne({
+      email,
+      passwordHash,
+      name: name || null,
+      plan: 'FREE',
+      addons: [],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    })
+
+    return c.json({ id: result.insertedId, email, name }, 201)
   }
+)
 
-  const users = getUsersCollection()
+// Login
+authRoute.openapi(
+  {
+    method: 'post',
+    path: '/login',
+    summary: 'Iniciar sesión',
+    request: {
+      body: {
+        content: {
+          'application/json': { schema: LoginSchema }
+        }
+      }
+    },
+    responses: {
+      200: {
+        description: 'Login correcto',
+        content: { 'application/json': { schema: TokenResponse } }
+      },
+      401: { description: 'Credenciales incorrectas' }
+    }
+  },
+  async (c) => {
+    const body = await c.req.json()
+    const { email, password } = body
 
-  const existing = await users.findOne({ email })
-  if (existing) {
-    return c.json({ error: 'Ese email ya está registrado' }, 409)
+    const users = getUsersCollection()
+    const user = await users.findOne({ email })
+    if (!user) return c.json({ error: 'Credenciales incorrectas' }, 401)
+
+    const ok = await Bun.password.verify(password, user.passwordHash)
+    if (!ok) return c.json({ error: 'Credenciales incorrectas' }, 401)
+
+    const token = await signJwt({
+      sub: String(user._id),
+      email: user.email,
+      plan: user.plan
+    })
+
+    return c.json({ token })
   }
-
-  const passwordHash = await Bun.password.hash(password)
-
-  const result = await users.insertOne({
-    email,
-    passwordHash,
-    name: name || null,
-    plan: 'FREE',
-    addons: [],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  })
-
-  return c.json({ id: result.insertedId, email, name, plan: 'FREE' }, 201)
-})
-
-// POST /api/v1/auth/login
-authRoute.post('/login', async (c) => {
-  const body = await c.req.json<LoginBody>()
-  const { email, password } = body
-
-  if (!email || !password) {
-    return c.json({ error: 'email y password son obligatorios' }, 400)
-  }
-
-  const users = getUsersCollection()
-  const user = await users.findOne<{ _id: any; email: string; passwordHash: string; plan?: string }>({ email })
-
-  if (!user) {
-    return c.json({ error: 'Credenciales incorrectas' }, 401)
-  }
-
-  const ok = await Bun.password.verify(password, user.passwordHash)
-  if (!ok) {
-    return c.json({ error: 'Credenciales incorrectas' }, 401)
-  }
-
-  const token = await signJwt({
-    sub: String(user._id),
-    email: user.email,
-    plan: user.plan || 'FREE',
-  })
-
-  return c.json({ token })
-})
+)
