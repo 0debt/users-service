@@ -1,6 +1,5 @@
-// src/routes/users.ts
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { ObjectId } from 'mongodb'
-import { OpenAPIHono, z } from '@hono/zod-openapi'
 import { authMiddleware } from '../middleware/auth'
 import { getUsersCollection } from '../db/mongo'
 import type { AppEnv, JwtUserPayload } from '../types/app'
@@ -9,7 +8,6 @@ import type { AppEnv, JwtUserPayload } from '../types/app'
 const ALLOWED_PLANS = ['FREE', 'PRO', 'ENTERPRISE'] as const
 type PlanType = (typeof ALLOWED_PLANS)[number]
 
-// Router con OpenAPI
 export const usersRoute = new OpenAPIHono<AppEnv>()
 
 // Todas las rutas requieren autenticación

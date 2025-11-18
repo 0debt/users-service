@@ -1,10 +1,10 @@
+// src/docs/openapi.ts
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { swaggerUI } from '@hono/swagger-ui'
 import type { AppEnv } from '../types/app'
 
 export const api = new OpenAPIHono<AppEnv>()
 
-// JSON de OpenAPI
 api.doc('/openapi.json', {
   openapi: '3.0.0',
   info: {
@@ -18,7 +18,21 @@ api.doc('/openapi.json', {
       description: 'API base path',
     },
   ],
-})
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+    },
+  },
+  security: [
+    {
+      bearerAuth: [],
+    },
+  ],
+} as any
+)
 
-// Swagger UI
 api.get('/docs', swaggerUI({ url: '/api/v1/openapi.json' }))
