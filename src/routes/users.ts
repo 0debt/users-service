@@ -13,9 +13,7 @@ export const usersRoute = new OpenAPIHono<AppEnv>()
 // Todas las rutas requieren autenticación
 usersRoute.use('*', authMiddleware)
 
-// =============================
 // GET /api/v1/users/me
-// =============================
 usersRoute.openapi(
   {
     method: 'get',
@@ -43,9 +41,7 @@ usersRoute.openapi(
   }
 )
 
-// =============================
 // GET /api/v1/users
-// =============================
 usersRoute.openapi(
   {
     method: 'get',
@@ -69,9 +65,7 @@ usersRoute.openapi(
   }
 )
 
-// =============================
 // GET /api/v1/users/:id
-// =============================
 usersRoute.openapi(
   {
     method: 'get',
@@ -113,9 +107,7 @@ usersRoute.openapi(
   }
 )
 
-// =============================
 // PATCH /api/v1/users/:id
-// =============================
 usersRoute.openapi(
   {
     method: 'patch',
@@ -179,9 +171,7 @@ usersRoute.openapi(
   }
 )
 
-// =============================
 // DELETE /api/v1/users/:id
-// =============================
 usersRoute.openapi(
   {
     method: 'delete',
@@ -218,5 +208,156 @@ usersRoute.openapi(
       return c.json({ error: 'Usuario no encontrado' }, 404)
 
     return c.json({ success: true })
+  }
+)
+
+// GET /api/v1/users/me/plan
+usersRoute.openapi(
+  {
+    method: 'get',
+    path: '/me/plan',
+    summary: 'Obtener plan y add-ons del usuario actual',
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: { description: 'Plan y add-ons' },
+      401: { description: 'No autenticado' },
+      404: { description: 'Usuario no encontrado' },
+    },
+  },
+  async (c) => {
+    const userFromToken = c.get('user') as JwtUserPayload
+
+    const users = getUsersCollection()
+    const user = await users.findOne(
+      { _id: new ObjectId(userFromToken.sub) },
+      { projection: { plan: 1, addons: 1 } }
+    )
+
+    if (!user) return c.json({ error: 'Usuario no encontrado' }, 404)
+
+    return c.json({
+      plan: user.plan,
+      addons: user.addons,
+    })
+  }
+)
+
+// PATCH /api/v1/users/:id/plan
+usersRoute.openapi(
+  {
+    method: 'patch',
+    path: '/{id}/plan',
+    summary: 'Cambiar plan del usuario logueado',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({
+        id: z.string().openapi({ description: 'ID del usuario' }),
+      }),
+      body: {
+        content: {
+          'application/json': {
+            schema: z
+              .object({
+                plan: z.enum(ALLOWED_PLANS),
+              })
+              .openapi('UpdatePlanBody'),
+          },
+        },
+      },
+    },
+    responses: {
+      200: { description: 'Plan actualizado' },
+      400: { description: 'Plan inválido' },
+      401: { description: 'No autenticado' },
+      403: { description: 'No autorizado' },
+      404: { description: 'Usuario no encontrado' },
+    },
+  },
+  async (c) => {
+    const id = c.req.param('id')
+
+    if (!id || !ObjectId.isValid(id)) {
+      return c.json({ error: 'ID no válido' }, 400)
+    }
+    const userFromToken = c.get('user') as JwtUserPayload
+    if (userFromToken.sub !== id)
+      return c.json({ error: 'Forbidden' }, 403)
+
+    const body = await c.req.json<{ plan: PlanType }>()
+
+    if (!ALLOWED_PLANS.includes(body.plan))
+      return c.json(
+        { error: `Plan no válido. Debe ser uno de: ${ALLOWED_PLANS.join(', ')}` },
+        400
+      )
+
+    const users = getUsersCollection()
+    const result = await users.findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $set: { plan: body.plan, updatedAt: new Date() } },
+      { returnDocument: 'after', projection: { passwordHash: 0 } }
+    )
+
+    if (!result) return c.json({ error: 'Usuario no encontrado' }, 404)
+
+    return c.json(result)
+  }
+)
+
+// PATCH /api/v1/users/:id/addons
+usersRoute.openapi(
+  {
+    method: 'patch',
+    path: '/{id}/addons',
+    summary: 'Actualizar add-ons del usuario logueado',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({
+        id: z.string().openapi({ description: 'ID del usuario' }),
+      }),
+      body: {
+        content: {
+          'application/json': {
+            schema: z
+              .object({
+                addons: z.array(z.string()),
+              })
+              .openapi('UpdateAddonsBody'),
+          },
+        },
+      },
+    },
+    responses: {
+      200: { description: 'Add-ons actualizados' },
+      400: { description: 'Datos inválidos' },
+      401: { description: 'No autenticado' },
+      403: { description: 'No autorizado' },
+      404: { description: 'Usuario no encontrado' },
+    },
+  },
+  async (c) => {
+    const id = c.req.param('id')
+
+    if (!id || !ObjectId.isValid(id)) {
+      return c.json({ error: 'ID no válido' }, 400)
+    }
+    const userFromToken = c.get('user') as JwtUserPayload
+    if (userFromToken.sub !== id)
+      return c.json({ error: 'Forbidden' }, 403)
+
+    const body = await c.req.json<{ addons: string[] }>()
+    if (!Array.isArray(body.addons))
+      return c.json({ error: 'addons debe ser un array de strings' }, 400)
+
+    const users = getUsersCollection()
+    const result = await users.findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $set: { addons: body.addons, updatedAt: new Date() } },
+      { returnDocument: 'after', projection: { passwordHash: 0 } }
+    )
+
+    if (!result) return c.json({ error: 'Usuario no encontrado' }, 404)
+
+    return c.json(result)
   }
 )
