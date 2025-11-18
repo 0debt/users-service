@@ -10,7 +10,7 @@ import { api } from './docs/openapi'
 
 await connectToDatabase()
 
-const app = new Hono()
+export const app = new Hono()
 
 app.use('*', logger())
 app.use('*', cors())
