@@ -12,6 +12,12 @@ api.doc('/openapi.json', {
     version: '1.0.0',
     description: 'API del microservicio de usuarios',
   },
+  servers: [
+    {
+      url: '/api/v1',
+      description: 'API base path',
+    },
+  ],
 })
 
 // Swagger UI
