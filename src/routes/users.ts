@@ -1,4 +1,4 @@
-import { OpenAPIHono } from '@hono/zod-openapi'
+import { OpenAPIHono, z } from '@hono/zod-openapi'
 import { ObjectId } from 'mongodb'
 import { authMiddleware } from '../middleware/auth'
 import { getUsersCollection } from '../db/mongo'
@@ -76,7 +76,7 @@ usersRoute.openapi(
   {
     method: 'get',
     path: '/{id}',
-    summary: 'Obtener un usuario por ID',
+    summary: 'Obtener usuario logueado por ID',
     security: [{ bearerAuth: [] }],
     request: {
       params: z.object({
@@ -120,7 +120,7 @@ usersRoute.openapi(
   {
     method: 'patch',
     path: '/{id}',
-    summary: 'Actualizar datos del usuario',
+    summary: 'Actualizar datos del usuario logueado',
     security: [{ bearerAuth: [] }],
     request: {
       params: z.object({
@@ -186,7 +186,7 @@ usersRoute.openapi(
   {
     method: 'delete',
     path: '/{id}',
-    summary: 'Eliminar usuario',
+    summary: 'Eliminar usuario logueado',
     security: [{ bearerAuth: [] }],
     request: {
       params: z.object({
