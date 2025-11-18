@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { ObjectId } from 'mongodb'
 import { authMiddleware } from '../middleware/auth'
 import { getUsersCollection } from '../db/mongo'
@@ -7,7 +7,7 @@ import type { AppEnv, JwtUserPayload } from '../types/app'
 const ALLOWED_PLANS = ['FREE', 'PRO', 'ENTERPRISE'] as const
 type PlanType = (typeof ALLOWED_PLANS)[number]
 
-export const usersRoute = new Hono<AppEnv>()
+export const usersRoute = new OpenAPIHono<AppEnv>()
 
 // Todas las rutas de aquí para abajo requieren estar autenticado
 usersRoute.use('*', authMiddleware)
