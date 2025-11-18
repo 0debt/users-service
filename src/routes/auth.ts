@@ -37,13 +37,13 @@ authRoute.post('/register', async (c) => {
     email,
     passwordHash,
     name: name || null,
-    plan: 'free',
+    plan: 'FREE',
     addons: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   })
 
-  return c.json({ id: result.insertedId, email, name, plan: 'free' }, 201)
+  return c.json({ id: result.insertedId, email, name, plan: 'FREE' }, 201)
 })
 
 // POST /api/v1/auth/login
@@ -70,7 +70,7 @@ authRoute.post('/login', async (c) => {
   const token = await signJwt({
     sub: String(user._id),
     email: user.email,
-    plan: user.plan || 'free',
+    plan: user.plan || 'FREE',
   })
 
   return c.json({ token })
