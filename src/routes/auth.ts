@@ -48,11 +48,16 @@ authRoute.openapi(
     }
 
     const passwordHash = await Bun.password.hash(password)
+    
+    const avatar = `https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(
+      name || email
+    )}`
 
     const result = await users.insertOne({
       email,
       passwordHash,
       name: name || null,
+      avatar,
       plan: 'FREE',
       addons: [],
       createdAt: new Date(),
@@ -66,7 +71,7 @@ authRoute.openapi(
       body: JSON.stringify({ userId: String(result.insertedId) })
     })
 
-    return c.json({ id: result.insertedId, email, name }, 201)
+    return c.json({ id: result.insertedId, email, name, avatar }, 201)
   }
 )
 

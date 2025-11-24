@@ -10,6 +10,39 @@ type PlanType = (typeof ALLOWED_PLANS)[number]
 
 export const usersRoute = new OpenAPIHono<AppEnv>()
 
+// Endpoint interno para group-service: GET /api/v1/internal/users/:id
+usersRoute.get('/internal/users/:id', async (c) => {
+  const id = c.req.param('id')
+
+  if (!id || !ObjectId.isValid(id)) {
+    return c.json({ error: 'ID no válido' }, 400)
+  }
+
+  const users = getUsersCollection()
+  const user = await users.findOne(
+    { _id: new ObjectId(id) },
+    {
+      projection: {
+        passwordHash: 0,
+        addons: 0,
+        plan: 0,
+        updatedAt: 0
+      }
+    }
+  )
+
+  if (!user) {
+    return c.json({ error: 'Usuario no encontrado' }, 404)
+  }
+
+  return c.json({
+    id: String(user._id),
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar
+  })
+})
+
 // Todas las rutas requieren autenticación
 usersRoute.use('*', authMiddleware)
 
@@ -361,36 +394,3 @@ usersRoute.openapi(
     return c.json(result)
   }
 )
-
-// Endpoint interno para group-service: GET /api/v1/internal/users/:id
-usersRoute.get('/internal/users/:id', async (c) => {
-  const id = c.req.param('id')
-
-  if (!id || !ObjectId.isValid(id)) {
-    return c.json({ error: 'ID no válido' }, 400)
-  }
-
-  const users = getUsersCollection()
-  const user = await users.findOne(
-    { _id: new ObjectId(id) },
-    {
-      projection: {
-        passwordHash: 0,
-        addons: 0,
-        plan: 0,
-        updatedAt: 0
-      }
-    }
-  )
-
-  if (!user) {
-    return c.json({ error: 'Usuario no encontrado' }, 404)
-  }
-
-  return c.json({
-    id: String(user._id),
-    name: user.name,
-    email: user.email,
-    avatar: user.avatar
-  })
-})
