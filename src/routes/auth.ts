@@ -59,6 +59,13 @@ authRoute.openapi(
       updatedAt: new Date()
     })
 
+    //Llamada a notification-service
+    await fetch("http://notifications-service:3000/preferences/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: String(result.insertedId) })
+    })
+
     return c.json({ id: result.insertedId, email, name }, 201)
   }
 )
