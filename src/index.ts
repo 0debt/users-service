@@ -8,8 +8,6 @@ import { usersRoute } from './routes/users'
 import { api } from './docs/openapi'
 
 
-await connectToDatabase()
-
 export const app = new Hono()
 
 app.use('*', logger())
@@ -23,7 +21,19 @@ api.route('/users', usersRoute)
 // Documentación
 app.route('/api/v1', api)
 
+if (!Bun.env.TEST) {
+  await connectToDatabase()
+}
+
+let isDbConnected = false
+
 export default {
   port: Number(Bun.env.PORT || 3000),
-  fetch: app.fetch,
+  fetch: async (req: Request, env: Record<string, unknown>) => {
+    if (!isDbConnected) {
+      await connectToDatabase()
+      isDbConnected = true
+    }
+    return app.fetch(req, env)
+  }
 }
