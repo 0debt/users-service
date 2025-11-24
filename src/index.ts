@@ -7,7 +7,6 @@ import { authRoute } from './routes/auth'
 import { usersRoute } from './routes/users'
 import { api } from './docs/openapi'
 
-
 await connectToDatabase()
 
 export const app = new Hono()

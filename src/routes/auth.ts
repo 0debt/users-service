@@ -64,6 +64,11 @@ authRoute.openapi(
       updatedAt: new Date()
     })
 
+    if (Bun.env.TEST === 'true') {
+      // En CI/test no llamamos a ningún microservicio
+      return c.json({ id: result.insertedId, email, name, avatar }, 201)
+    }
+
     //Llamada a notification-service
     try {
 

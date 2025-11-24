@@ -2,13 +2,19 @@ name: CI/CD Users Service
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "workflow"]
   pull_request:
     branches: ["main"]
 
 jobs:
   test-build-publish:
     runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
 
     permissions:
       contents: write    
@@ -31,6 +37,7 @@ jobs:
       - name: Run tests
         env:
           MONGODB_URI: "mongodb://localhost:27017/testdb"
+          JWT_SECRET: "testsecret"
         run: bun test
 
       # Solo publicar en push a main (no en PR)
