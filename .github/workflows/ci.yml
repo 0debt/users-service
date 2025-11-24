@@ -1,0 +1,67 @@
+name: CI/CD Users Service
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test-build-publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write    
+      packages: write   
+
+    steps:
+      # Descargar repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Instalar Bun
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+
+      # Instalar dependencias
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Ejecutar tests
+      - name: Run tests
+        env:
+          MONGODB_URI: "mongodb://localhost:27017/testdb"
+        run: bun test
+
+      # Solo publicar en push a main (no en PR)
+      - name: Skip publish on PR
+        if: github.event_name == 'pull_request'
+        run: echo "Skipping docker publish on PR"
+
+      # Versionado semántico automático
+      - name: Bump version & push tag
+        id: semver
+        if: github.event_name == 'push'
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          default_bump: patch
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Login a GitHub Container Registry (GHCR)
+      - name: Login to GHCR
+        if: github.event_name == 'push'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+
+      # Construir imagen Docker con tag semántico
+      - name: Build Docker image
+        if: github.event_name == 'push'
+        run: |
+          docker build -t ghcr.io/${{ github.repository_owner }}/users-service:${{ steps.semver.outputs.new_tag }} .
+          docker tag ghcr.io/${{ github.repository_owner }}/users-service:${{ steps.semver.outputs.new_tag }} ghcr.io/${{ github.repository_owner }}/users-service:latest
+
+      # Push de las imágenes a GHCR
+      - name: Push Docker image
+        if: github.event_name == 'push'
+        run: |
+          docker push ghcr.io/${{ github.repository_owner }}/users-service:${{ steps.semver.outputs.new_tag }}
+          docker push ghcr.io/${{ github.repository_owner }}/users-service:latest
