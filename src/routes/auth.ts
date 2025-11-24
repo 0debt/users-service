@@ -49,17 +49,33 @@ authRoute.openapi(
 
     const passwordHash = await Bun.password.hash(password)
 
+    const avatar = `https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(
+      name || email
+    )}`
+
     const result = await users.insertOne({
       email,
       passwordHash,
       name: name || null,
+      avatar,
       plan: 'FREE',
       addons: [],
       createdAt: new Date(),
       updatedAt: new Date()
     })
 
-    return c.json({ id: result.insertedId, email, name }, 201)
+    //Llamada a notification-service
+    try {
+
+      await fetch("http://notifications-service:3000/preferences/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: String(result.insertedId) })
+      })
+    } catch (err) {
+      console.warn("Para no romper tests")
+    }
+    return c.json({ id: result.insertedId, email, name, avatar }, 201)
   }
 )
 
