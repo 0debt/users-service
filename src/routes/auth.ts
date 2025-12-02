@@ -118,20 +118,25 @@ authRoute.openapi(
 
     // ---------- THROTTLING EN LOGIN (Redis) ----------
     if (redis) {
-      const key = `login_attempts:${email}`
-      const attempts = await redis.incr(key)
+      try {
+        const key = `login_attempts:${email}`;
+        const attempts = await redis.incr(key);
 
-      if (attempts === 1) {
-        await redis.expire(key, 60)
-      }
+        if (attempts === 1) {
+          await redis.expire(key, 60);
+        }
 
-      if (attempts > 5) {
-        return c.json(
-          { error: "Demasiados intentos. Espera 1 minuto antes de volver a intentarlo." },
-          429
-        )
+        if (attempts > 5) {
+          return c.json(
+            { error: "Demasiados intentos. Espera 1 minuto." },
+            429
+          );
+        }
+      } catch (_) {
+        // Si Redis falla, no afecta a /login
       }
     }
+
 
 
     const users = getUsersCollection()
