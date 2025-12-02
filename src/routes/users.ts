@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb'
 import { authMiddleware } from '../middleware/auth'
 import { getUsersCollection } from '../db/mongo'
 import type { AppEnv, JwtUserPayload } from '../types/app'
+import { redis } from '../lib/redis'
 
 // Planes permitidos
 const ALLOWED_PLANS = ['FREE', 'PRO', 'ENTERPRISE'] as const
@@ -34,6 +35,14 @@ usersRoute.openapi(
       return c.json({ error: 'ID no válido' }, 400)
     }
 
+    //Caché con Redis
+    const cacheKey = `user:${id}`
+    const cached = await redis.get(cacheKey)
+
+    if (cached) {
+      return c.json(JSON.parse(cached))
+    }
+
     const users = getUsersCollection()
     const user = await users.findOne(
       { _id: new ObjectId(id) },
@@ -50,13 +59,18 @@ usersRoute.openapi(
       return c.json({ error: 'Usuario no encontrado' }, 404)
     }
 
-    return c.json({
+    const response = {
       id: String(user._id),
       name: user.name,
       email: user.email,
       avatar: user.avatar,
-      plan: user.plan 
-    })
+      plan: user.plan
+    }
+
+    //Guardar en caché
+    await redis.set(cacheKey, JSON.stringify(response), "EX", 60)
+
+    return c.json(response)
   }
 )
 
