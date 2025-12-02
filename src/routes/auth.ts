@@ -1,6 +1,7 @@
 import { OpenAPIHono, z } from '@hono/zod-openapi'
 import { getUsersCollection } from '../db/mongo'
 import { signJwt } from '../utils/jwt'
+import { redis } from "../lib/redis"
 
 export const authRoute = new OpenAPIHono()
 
@@ -111,6 +112,24 @@ authRoute.openapi(
   async (c) => {
     const body = await c.req.json()
     const { email, password } = body
+
+    // ---------- THROTTLING EN LOGIN (Redis) ----------
+    const key = `login_attempts:${email}`
+    const attempts = await redis.incr(key)
+
+    if (attempts === 1) {
+      // Primera vez -> asignamos TTL de 60s
+      await redis.expire(key, 60)
+    }
+
+    if (attempts > 5) {
+      return c.json(
+        {
+          error: "Demasiados intentos. Espera 1 minuto antes de volver a intentarlo."
+        },
+        429
+      )
+    }
 
     const users = getUsersCollection()
     const user = await users.findOne({ email })
