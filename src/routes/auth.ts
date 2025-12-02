@@ -106,7 +106,10 @@ authRoute.openapi(
         description: 'Login correcto',
         content: { 'application/json': { schema: TokenResponse } }
       },
-      401: { description: 'Credenciales incorrectas' }
+      401: { description: 'Credenciales incorrectas' },
+      429: {
+        description: "Demasiados intentos. Rate limit activo."
+      }
     }
   },
   async (c) => {
