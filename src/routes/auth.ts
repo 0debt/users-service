@@ -1,6 +1,7 @@
 import { OpenAPIHono, z } from '@hono/zod-openapi'
 import { getUsersCollection } from '../db/mongo'
 import { signJwt } from '../utils/jwt'
+import { redis } from "../lib/redis"
 
 export const authRoute = new OpenAPIHono()
 
@@ -64,10 +65,10 @@ authRoute.openapi(
       updatedAt: new Date()
     })
 
-    if (Bun.env.TEST === 'true') {
-      // En CI/test no llamamos a ningún microservicio
+    if (Bun.env.TEST === "true" || process.env.CI === "true") {
       return c.json({ id: result.insertedId, email, name, avatar }, 201)
     }
+
 
     // Llamada a notification-service
     try {
@@ -105,12 +106,38 @@ authRoute.openapi(
         description: 'Login correcto',
         content: { 'application/json': { schema: TokenResponse } }
       },
-      401: { description: 'Credenciales incorrectas' }
+      401: { description: 'Credenciales incorrectas' },
+      429: {
+        description: "Demasiados intentos. Rate limit activo."
+      }
     }
   },
   async (c) => {
     const body = await c.req.json()
     const { email, password } = body
+
+    // ---------- THROTTLING EN LOGIN (Redis) ----------
+    if (redis) {
+      try {
+        const key = `login_attempts:${email}`;
+        const attempts = await redis.incr(key);
+
+        if (attempts === 1) {
+          await redis.expire(key, 60);
+        }
+
+        if (attempts > 5) {
+          return c.json(
+            { error: "Demasiados intentos. Espera 1 minuto." },
+            429
+          );
+        }
+      } catch (_) {
+        // Si Redis falla, no afecta a /login
+      }
+    }
+
+
 
     const users = getUsersCollection()
     const user = await users.findOne({ email })
