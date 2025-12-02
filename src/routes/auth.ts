@@ -69,17 +69,20 @@ authRoute.openapi(
       return c.json({ id: result.insertedId, email, name, avatar }, 201)
     }
 
-    //Llamada a notification-service
+    // Llamada a notification-service
     try {
+      const NOTIFICATIONS_SERVICE_URL =
+        process.env.NOTIFICATIONS_SERVICE_URL || "http://notifications-service:3000"
 
-      await fetch("http://notifications-service:3000/preferences/init", {
+      await fetch(`${NOTIFICATIONS_SERVICE_URL}/preferences/init`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: String(result.insertedId) })
+        body: JSON.stringify({ userId: String(result.insertedId), email })
       })
     } catch (err) {
-      console.warn("Para no romper tests")
+      console.warn("Notificaciones no disponibles (OK en tests):", err)
     }
+
     return c.json({ id: result.insertedId, email, name, avatar }, 201)
   }
 )
