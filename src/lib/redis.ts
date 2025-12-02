@@ -1,16 +1,28 @@
 import Redis from "ioredis";
 
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+const isTest = Bun.env.TEST === "true";
 
-console.log(`Conectando a Redis en ${redisUrl}...`);
+// Si estamos en test, Redis se desactiva
+if (isTest) {
+  console.log("⚠️ Redis desactivado en modo TEST");
+}
 
-export const redis = new Redis(redisUrl, {
-    maxRetriesPerRequest: 3,
+let redis: Redis | null = null;
+
+if (!isTest) {
+  const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+
+  redis = new Redis(redisUrl, {
+    maxRetriesPerRequest: 1,
     retryStrategy(times) {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
+      if (times > 3) return null;
+      return Math.min(times * 100, 2000);
     },
-});
+  });
 
-redis.on("connect", () => console.log("Conectado a Redis"));
-redis.on("error", (err) => console.error("error Redis:", err));
+  redis.on("error", (err) => {
+    console.warn("⚠️ Redis error (ignorado en dev/test):", err.message);
+  });
+}
+
+export { redis };

@@ -37,11 +37,14 @@ usersRoute.openapi(
 
     //Caché con Redis
     const cacheKey = `user:${id}`
-    const cached = await redis.get(cacheKey)
-
-    if (cached) {
-      return c.json(JSON.parse(cached))
+    // Solo usar caché si Redis está disponible
+    if (redis) {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return c.json(JSON.parse(cached));
+      }
     }
+
 
     const users = getUsersCollection()
     const user = await users.findOne(
@@ -68,7 +71,9 @@ usersRoute.openapi(
     }
 
     //Guardar en caché
-    await redis.set(cacheKey, JSON.stringify(response), "EX", 60)
+    if (redis) {
+      await redis.set(cacheKey, JSON.stringify(response), "EX", 60);
+    }
 
     return c.json(response)
   }

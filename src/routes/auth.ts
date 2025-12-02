@@ -117,22 +117,22 @@ authRoute.openapi(
     const { email, password } = body
 
     // ---------- THROTTLING EN LOGIN (Redis) ----------
-    const key = `login_attempts:${email}`
-    const attempts = await redis.incr(key)
+    if (redis) {
+      const key = `login_attempts:${email}`
+      const attempts = await redis.incr(key)
 
-    if (attempts === 1) {
-      // Primera vez -> asignamos TTL de 60s
-      await redis.expire(key, 60)
+      if (attempts === 1) {
+        await redis.expire(key, 60)
+      }
+
+      if (attempts > 5) {
+        return c.json(
+          { error: "Demasiados intentos. Espera 1 minuto antes de volver a intentarlo." },
+          429
+        )
+      }
     }
 
-    if (attempts > 5) {
-      return c.json(
-        {
-          error: "Demasiados intentos. Espera 1 minuto antes de volver a intentarlo."
-        },
-        429
-      )
-    }
 
     const users = getUsersCollection()
     const user = await users.findOne({ email })
