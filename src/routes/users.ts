@@ -10,38 +10,55 @@ type PlanType = (typeof ALLOWED_PLANS)[number]
 
 export const usersRoute = new OpenAPIHono<AppEnv>()
 
-// Endpoint interno para group-service: GET /api/v1/internal/users/:id
-usersRoute.get('/internal/users/:id', async (c) => {
-  const id = c.req.param('id')
-
-  if (!id || !ObjectId.isValid(id)) {
-    return c.json({ error: 'ID no válido' }, 400)
-  }
-
-  const users = getUsersCollection()
-  const user = await users.findOne(
-    { _id: new ObjectId(id) },
-    {
-      projection: {
-        passwordHash: 0,
-        addons: 0,
-        plan: 0,
-        updatedAt: 0
-      }
+// GET /api/v1/internal/users/:id
+usersRoute.openapi(
+  {
+    method: 'get',
+    path: '/internal/users/{id}',
+    summary: 'Obtener datos internos de un usuario (solo microservicios)',
+    responses: {
+      200: { description: 'Datos internos del usuario' },
+      400: { description: 'ID no válido' },
+      404: { description: 'Usuario no encontrado' }
+    },
+    request: {
+      params: z.object({
+        id: z.string().openapi({ example: '675a1fa2923d2bd1e4cd9f12' })
+      })
     }
-  )
+  },
+  async (c) => {
+    const id = c.req.param('id')
 
-  if (!user) {
-    return c.json({ error: 'Usuario no encontrado' }, 404)
+    if (!id || !ObjectId.isValid(id)) {
+      return c.json({ error: 'ID no válido' }, 400)
+    }
+
+    const users = getUsersCollection()
+    const user = await users.findOne(
+      { _id: new ObjectId(id) },
+      {
+        projection: {
+          passwordHash: 0,
+          addons: 0,
+          updatedAt: 0
+        }
+      }
+    )
+
+    if (!user) {
+      return c.json({ error: 'Usuario no encontrado' }, 404)
+    }
+
+    return c.json({
+      id: String(user._id),
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      plan: user.plan 
+    })
   }
-
-  return c.json({
-    id: String(user._id),
-    name: user.name,
-    email: user.email,
-    avatar: user.avatar
-  })
-})
+)
 
 // Todas las rutas requieren autenticación
 usersRoute.use('*', authMiddleware)
