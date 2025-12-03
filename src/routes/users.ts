@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth'
 import { getUsersCollection } from '../db/mongo'
 import type { AppEnv, JwtUserPayload } from '../types/app'
 import { redis } from '../lib/redis'
+import { supabase } from "../lib/supabase";
 
 // Planes permitidos
 const ALLOWED_PLANS = ['FREE', 'PRO', 'ENTERPRISE'] as const
@@ -430,3 +431,87 @@ usersRoute.openapi(
     return c.json(result)
   }
 )
+
+const MAX_FILE_SIZE = 1 * 1024 * 1024 // 1MB
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
+
+// PATCH /api/v1/users/:id/avatar
+usersRoute.openapi(
+  {
+    method: "patch",
+    path: "/{id}/avatar",
+    summary: "Subir avatar del usuario",
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({
+        id: z.string(),
+      })
+    },
+    responses: {
+      200: { description: "Avatar actualizado" },
+      400: { description: "Archivo inválido o demasiado grande (máx 1MB). Solo JPG, PNG o WEBP." },
+      403: { description: "No autorizado" },
+      500: { description: "Error en servidor o Supabase" }
+    }
+  },
+  async (c) => {
+    const id = c.req.param("id");
+
+    if (!id || !ObjectId.isValid(id)) {
+      return c.json({ error: "ID no válido" }, 400)
+    }
+    const userFromToken = c.get("user");
+
+    if (!userFromToken || userFromToken.sub !== id)
+      return c.json({ error: "Forbidden" }, 403);
+
+    const form = await c.req.formData();
+    const file = form.get("avatar") as File | null;
+
+    if (!file) {
+      return c.json({ error: "No se envió archivo" }, 400);
+    }
+    // ---------- VALIDACIÓN DE TIPO ----------
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return c.json(
+        { error: "Tipo de archivo no permitido. Solo JPG, PNG o WebP." },
+        400
+      )
+    }
+
+    // ---------- VALIDACIÓN DE TAMAÑO ----------
+    if (file.size > MAX_FILE_SIZE) {
+      return c.json(
+        { error: "El archivo es demasiado grande. Máximo 1MB." },
+        400
+      )
+    }
+    const arrayBuffer = Buffer.from(await file.arrayBuffer())
+    const filePath = `avatars/${id}-${Date.now()}`
+
+    const { error } = await supabase.storage
+      .from(process.env.SUPABASE_BUCKET!)
+      .upload(filePath, Buffer.from(arrayBuffer), {
+        contentType: file.type,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Supabase upload error:", error)
+      return c.json({ error: "Error al subir avatar" }, 500)
+    }
+
+    const publicUrl =
+      `${process.env.SUPABASE_URL}/storage/v1/object/public/${process.env.SUPABASE_BUCKET}/${filePath}`;
+
+    // Guardar avatar en Mongo
+    const users = getUsersCollection();
+    await users.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { avatar: publicUrl } }
+    );
+
+    return c.json({ avatar: publicUrl });
+  }
+);
+
