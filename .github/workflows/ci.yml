@@ -69,6 +69,7 @@ jobs:
 
       # Build & push multi-arch Docker image
       - name: Build and push Docker image
+        if: github.event_name == 'push'
         run: |
           IMAGE=ghcr.io/${{ github.repository_owner }}/users-service
           TAG=${{ steps.semver.outputs.new_tag }}
@@ -82,6 +83,7 @@ jobs:
 
       # Trigger Coolify Deployment
       - name: Trigger Coolify Deployment
+        if: github.event_name == 'push'
         run: |
           echo "Triggering Coolify deployment for ${{ github.ref_name }}..."
           curl -X POST \
