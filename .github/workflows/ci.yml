@@ -52,23 +52,40 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           default_bump: patch
+          tag_prefix: "v"
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Login a GitHub Container Registry (GHCR)
+      # Set up QEMU 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login to GHCR
       - name: Login to GHCR
-        if: github.event_name == 'push'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
 
-      # Construir imagen Docker con tag semántico
-      - name: Build Docker image
+      # Build & push multi-arch Docker image
+      - name: Build and push Docker image
         if: github.event_name == 'push'
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/users-service:${{ steps.semver.outputs.new_tag }} .
-          docker tag ghcr.io/${{ github.repository_owner }}/users-service:${{ steps.semver.outputs.new_tag }} ghcr.io/${{ github.repository_owner }}/users-service:latest
+          IMAGE=ghcr.io/${{ github.repository_owner }}/users-service
+          TAG=${{ steps.semver.outputs.new_tag }}
+          echo "Building $IMAGE:$TAG for amd64 and arm64..."
 
-      # Push de las imágenes a GHCR
-      - name: Push Docker image
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -t $IMAGE:$TAG \
+            -t $IMAGE:latest \
+            --push .
+
+      # Trigger Coolify Deployment
+      - name: Trigger Coolify Deployment
         if: github.event_name == 'push'
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/users-service:${{ steps.semver.outputs.new_tag }}
-          docker push ghcr.io/${{ github.repository_owner }}/users-service:latest
+          echo "Triggering Coolify deployment for ${{ github.ref_name }}..."
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_KEY }}" \
+            "${{ secrets.COOLIFY_URL_WH }}"
