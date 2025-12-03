@@ -74,7 +74,7 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/users-service:${{ steps.semver.outputs.new_tag }}
           docker push ghcr.io/${{ github.repository_owner }}/users-service:latest
 
-          - name: Build and push multi-arch image
+      - name: Build and push multi-arch image
         run: |
           IMAGE=ghcr.io/${{ github.repository_owner }}/users-service
           TAG=${{ github.ref_name }}
