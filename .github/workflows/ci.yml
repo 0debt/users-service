@@ -52,6 +52,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           default_bump: patch
+          tag_prefix: "v"
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       # Login a GitHub Container Registry (GHCR)
@@ -72,3 +73,21 @@ jobs:
         run: |
           docker push ghcr.io/${{ github.repository_owner }}/users-service:${{ steps.semver.outputs.new_tag }}
           docker push ghcr.io/${{ github.repository_owner }}/users-service:latest
+
+          - name: Build and push multi-arch image
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/users-service
+          TAG=${{ github.ref_name }}
+          echo "Building $IMAGE for amd64 and arm64..."
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -t $IMAGE:$TAG \
+            -t $IMAGE:latest \
+            --push .
+
+      - name: Trigger deployment (Coolify)
+        run: |
+          echo "Triggering Coolify deployment for ${{ github.ref_name }}..."
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_KEY }}" \
+            "${{ secrets.COOLIFY_URL_WH }}"
