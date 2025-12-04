@@ -149,7 +149,8 @@ authRoute.openapi(
     const token = await signJwt({
       sub: String(user._id),
       email: user.email,
-      plan: user.plan
+      plan: user.plan,
+      iss: user.plan.toLowerCase()  // "free", "pro", "enterprise"
     })
 
     return c.json({ token })
