@@ -2,6 +2,7 @@ import { OpenAPIHono, z } from '@hono/zod-openapi'
 import { getUsersCollection } from '../db/mongo'
 import { signJwt } from '../utils/jwt'
 import { redis } from "../lib/redis"
+import { notifyPreferencesInit } from '../lib/notificationClient'
 
 export const authRoute = new OpenAPIHono()
 
@@ -75,11 +76,14 @@ authRoute.openapi(
       const NOTIFICATIONS_SERVICE_URL =
         process.env.NOTIFICATIONS_SERVICE_URL || "http://notifications-service:3000"
 
-      await fetch(`${NOTIFICATIONS_SERVICE_URL}/preferences/init`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: String(result.insertedId), email })
-      })
+      if (Bun.env.TEST !== "true") {
+        const notifyResult = await notifyPreferencesInit(String(result.insertedId), email)
+
+        if (!notifyResult.ok) {
+          console.warn("Notificaciones no disponibles. CircuitBreaker estado REAL:", notifyResult.state)
+        }
+      }
+
     } catch (err) {
       console.warn("Notificaciones no disponibles (OK en tests):", err)
     }
