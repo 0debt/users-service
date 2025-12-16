@@ -433,7 +433,7 @@ usersRoute.openapi(
 )
 
 const MAX_FILE_SIZE = 1 * 1024 * 1024 // 1MB
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/jpg"]
 
 // PATCH /api/v1/users/:id/avatar
 usersRoute.openapi(
