@@ -1,21 +1,25 @@
-import { notifyPreferencesInit } from "../lib/notificationClient"
 import { test, expect, beforeEach } from "bun:test";
 
 const originalFetch = global.fetch
+
+async function loadClient() {
+  return await import(`../lib/notificationClient?ts=${Date.now()}`)
+}
 
 beforeEach(() => {
   global.fetch = originalFetch
 })
 
 test("notifyPreferencesInit returns CLOSED on first success", async () => {
-    global.fetch = (() =>
+  global.fetch = (() =>
     Promise.resolve(
-        new Response(JSON.stringify({}), {
+      new Response(JSON.stringify({}), {
         status: 200,
         headers: { "Content-Type": "application/json" }
-        })
+      })
     )) as any;
 
+  const { notifyPreferencesInit } = await loadClient()
 
   const result = await notifyPreferencesInit("123", "email@test.com")
   expect(result.state).toBe("CLOSED")
@@ -28,6 +32,8 @@ test("notifyPreferencesInit triggers OPEN after repeated failures", async () => 
         status: 500
       })
     );
+  const { notifyPreferencesInit } = await loadClient()
+
   await notifyPreferencesInit("1", "a@test.com")
   await notifyPreferencesInit("1", "a@test.com")
   const r3 = await notifyPreferencesInit("1", "a@test.com")
@@ -41,7 +47,9 @@ test("notifyPreferencesInit returns fallback when OPEN", async () => {
       new Response(JSON.stringify({ error: "fail" }), {
         status: 500
       })
-    );       
+    );
+  const { notifyPreferencesInit } = await loadClient()
+
   await notifyPreferencesInit("1", "a@test.com")
   await notifyPreferencesInit("1", "a@test.com")
   await notifyPreferencesInit("1", "a@test.com")
