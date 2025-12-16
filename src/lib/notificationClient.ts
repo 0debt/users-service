@@ -1,6 +1,7 @@
 import { CircuitBreaker } from "./circuitBreaker"
 
 const breaker = new CircuitBreaker()
+export const notificationBreaker = new CircuitBreaker()
 
 export async function notifyPreferencesInit(userId: string, email: string) {
 

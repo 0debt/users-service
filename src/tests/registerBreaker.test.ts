@@ -1,12 +1,15 @@
 import { app } from '../../src/index'
 import { test, expect, beforeEach } from "bun:test";
-import { notifyPreferencesInit } from "../lib/notificationClient";
+import { notifyPreferencesInit, notificationBreaker } from "../lib/notificationClient";
+
 
 
 const originalFetch = global.fetch
 
 beforeEach(() => {
   global.fetch = originalFetch
+  notificationBreaker.reset()
+
 })
 
 function randomEmail() {
@@ -66,7 +69,6 @@ test("CircuitBreaker enters OPEN after 3 failed registers", async () => {
   })
 
   expect(res3.status).toBe(201)
-  // a esta altura ya está en OPEN en notifyPreferencesInit() internamente
 })
 
 test("When breaker is OPEN, /register uses fallback immediately", async () => {
@@ -81,7 +83,6 @@ test("When breaker is OPEN, /register uses fallback immediately", async () => {
   await notifyPreferencesInit("1", "a@test.com")
   await notifyPreferencesInit("1", "a@test.com")
 
-  // ahora fallback sin esperar
   const email = randomEmail()
   const res = await app.request("/api/v1/auth/register", {
     method: "POST",

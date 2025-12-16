@@ -8,6 +8,12 @@ export class CircuitBreaker {
     private readonly cooldownTime = 30000 
   ) {}
 
+  public reset() {
+    this.failures = 0
+    this.state = "CLOSED"
+    this.nextAttempt = 0
+  }
+
   public canRequest() {
     if (this.state === "OPEN") {
       if (Date.now() > this.nextAttempt) {
