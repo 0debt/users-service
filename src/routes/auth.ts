@@ -116,7 +116,7 @@ authRoute.openapi(
     const body = await c.req.json()
     const { email, password } = body
 
-    // ---------- THROTTLING EN LOGIN (Redis) ----------
+    //  THROTTLING EN LOGIN (Redis) 
     if (redis) {
       try {
         const key = `login_attempts:${email}`;
