@@ -5,6 +5,7 @@ import { getUsersCollection } from '../db/mongo'
 import type { AppEnv, JwtUserPayload } from '../types/app'
 import { redis } from '../lib/redis'
 import { supabase } from "../lib/supabase";
+import { BadRequestResponse, UnauthorizedResponse, ForbiddenResponse, NotFoundResponse } from '../schemas/errors'
 
 // Planes permitidos
 const ALLOWED_PLANS = ['FREE', 'PRO', 'ENTERPRISE'] as const
@@ -12,21 +13,59 @@ type PlanType = (typeof ALLOWED_PLANS)[number]
 
 export const usersRoute = new OpenAPIHono<AppEnv>()
 
+const UserPublicSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  email: z.string().email(),
+  avatar: z.string().url(),
+  plan: z.string()
+}).openapi('UserPublic')
+
+const UserSelfSchema = z.object({
+  _id: z.any(),
+  email: z.string().email(),
+  name: z.string().nullable(),
+  avatar: z.string().url(),
+  plan: z.string(),
+  addons: z.array(z.string()).optional(),
+  createdAt: z.date().optional()
+}).openapi('UserSelf')
+
+const SuccessResponseSchema = z.object({
+  success: z.boolean()
+}).openapi('SuccessResponse')
+
+
 // GET /api/v1/internal/users/:id
 usersRoute.openapi(
   {
     method: 'get',
     path: '/internal/users/{id}',
     summary: 'Obtener datos internos de un usuario (solo microservicios)',
-    responses: {
-      200: { description: 'Datos internos del usuario' },
-      400: { description: 'ID no válido' },
-      404: { description: 'Usuario no encontrado' }
-    },
+    description: `
+      Endpoint interno usado por otros microservicios.
+      Incluye caché Redis para optimizar lecturas frecuentes.
+    `,
+    tags: ['Internal'],
     request: {
       params: z.object({
-        id: z.string().openapi({ example: '675a1fa2923d2bd1e4cd9f12' })
+        id: z.string().openapi({
+          example: '675a1fa2923d2bd1e4cd9f12',
+          description: 'ID MongoDB del usuario'
+        })
       })
+    },
+    responses: {
+      200: {
+        description: 'Datos internos del usuario',
+        content: {
+          'application/json': {
+            schema: UserPublicSchema
+          }
+        }
+      },
+      400: BadRequestResponse,
+      404: NotFoundResponse
     }
   },
   async (c) => {
@@ -89,11 +128,43 @@ usersRoute.openapi(
     method: 'get',
     path: '/me',
     summary: 'Obtener datos del usuario autenticado',
+    description: 'Devuelve el perfil del usuario identificado por el JWT',
+    tags: ['Users'],
     security: [{ bearerAuth: [] }],
     responses: {
-      200: { description: 'Datos del usuario actual' },
-      401: { description: 'No autenticado' },
-      404: { description: 'Usuario no encontrado' },
+      200: {
+        description: 'Datos del usuario autenticado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              _id: '675a1fa2923d2bd1e4cd9f12',
+              email: 'user@example.com',
+              name: 'Juan Pérez',
+              avatar: 'https://api.dicebear.com/7.x/thumbs/svg?...',
+              plan: 'FREE',
+              addons: [],
+              createdAt: '2024-12-01T10:00:00.000Z'
+            }
+          }
+        }
+      },
+      401: {
+        description: 'No autenticado',
+        content: {
+          'application/json': {
+            schema: z.object({
+              error: z.string()
+            }),
+            example: {
+              error: 'Unauthorized'
+            }
+          }
+        }
+      },
+      404: {
+        description: 'Usuario no encontrado',
+      },
     },
   },
   async (c) => {
@@ -117,11 +188,55 @@ usersRoute.openapi(
     method: 'get',
     path: '/',
     summary: 'Listar usuarios (solo pruebas)',
+    description: `
+      Devuelve una lista de usuarios registrados en el sistema.
+
+      Endpoint destinado únicamente a pruebas y entornos de desarrollo.
+      - Requiere autenticación JWT
+      - No incluye hashes de contraseña
+      - Máximo 50 usuarios
+    `,
+    tags: ['Users'],
     security: [{ bearerAuth: [] }],
     responses: {
-      200: { description: 'Lista de usuarios' },
-      401: { description: 'No autenticado' },
-    },
+      200: {
+        description: 'Lista de usuarios',
+        content: {
+          'application/json': {
+            schema: z.array(z.any()),
+            example: [
+              {
+                _id: '675a1fa2923d2bd1e4cd9f12',
+                email: 'user1@example.com',
+                name: 'Juan Pérez',
+                avatar: 'https://api.dicebear.com/7.x/thumbs/svg?...',
+                plan: 'FREE',
+                addons: []
+              },
+              {
+                _id: '675a1fa2923d2bd1e4cd9f13',
+                email: 'user2@example.com',
+                name: 'Ana Gómez',
+                avatar: 'https://api.dicebear.com/7.x/thumbs/svg?...',
+                plan: 'PRO',
+                addons: ['analytics']
+              }
+            ]
+          }
+        }
+      },
+      401: {
+        description: 'No autenticado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Unauthorized'
+            }
+          }
+        }
+      }
+    }
   },
   async (c) => {
     const users = getUsersCollection()
@@ -141,6 +256,16 @@ usersRoute.openapi(
     method: 'get',
     path: '/{id}',
     summary: 'Obtener usuario logueado por ID',
+    description: `
+      Devuelve los datos del usuario identificado por su ID.
+
+      Restricciones:
+      - El usuario debe estar autenticado
+      - Solo se permite acceder a los datos del propio usuario
+      - El ID debe ser un ObjectId válido de MongoDB
+      - No se incluyen datos sensibles como el hash de la contraseña
+    `,
+    tags: ['Users'],
     security: [{ bearerAuth: [] }],
     request: {
       params: z.object({
