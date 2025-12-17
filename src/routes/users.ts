@@ -21,21 +21,6 @@ const UserPublicSchema = z.object({
   plan: z.string()
 }).openapi('UserPublic')
 
-const UserSelfSchema = z.object({
-  _id: z.any(),
-  email: z.string().email(),
-  name: z.string().nullable(),
-  avatar: z.string().url(),
-  plan: z.string(),
-  addons: z.array(z.string()).optional(),
-  createdAt: z.date().optional()
-}).openapi('UserSelf')
-
-const SuccessResponseSchema = z.object({
-  success: z.boolean()
-}).openapi('SuccessResponse')
-
-
 // GET /api/v1/internal/users/:id
 usersRoute.openapi(
   {
@@ -273,11 +258,67 @@ usersRoute.openapi(
       }),
     },
     responses: {
-      200: { description: 'Usuario encontrado' },
-      400: { description: 'ID no válido' },
-      401: { description: 'No autenticado' },
-      403: { description: 'No autorizado' },
-      404: { description: 'Usuario no encontrado' },
+      200: {
+        description: 'Usuario encontrado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              _id: '675a1fa2923d2bd1e4cd9f12',
+              email: 'user@example.com',
+              name: 'Juan Pérez',
+              avatar: 'https://api.dicebear.com/7.x/thumbs/svg?...',
+              plan: 'FREE',
+              addons: [],
+              createdAt: '2024-12-01T10:00:00.000Z'
+            }
+          }
+        }
+      },
+      400: {
+        description: 'ID no válido',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'ID no válido'
+            }
+          }
+        }
+      },
+      401: {
+        description: 'No autenticado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Unauthorized'
+            }
+          }
+        }
+      },
+      403: {
+        description: 'No autorizado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Forbidden'
+            }
+          }
+        }
+      },
+      404: {
+        description: 'Usuario no encontrado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Usuario no encontrado'
+            }
+          }
+        }
+      },
     },
   },
   async (c) => {
@@ -308,29 +349,103 @@ usersRoute.openapi(
     method: 'patch',
     path: '/{id}',
     summary: 'Actualizar datos del usuario logueado',
+    description: `
+      Permite actualizar los datos del usuario autenticado.
+
+      Restricciones:
+      - Requiere autenticación JWT
+      - Solo el propio usuario puede modificar sus datos
+      - El ID debe ser un ObjectId válido
+    `,
+    tags: ['Users'],
     security: [{ bearerAuth: [] }],
     request: {
       params: z.object({
-        id: z.string().openapi({ description: 'ID del usuario' }),
+        id: z.string().openapi({
+          description: 'ID del usuario',
+          example: '675a1fa2923d2bd1e4cd9f12'
+        }),
       }),
       body: {
         content: {
           'application/json': {
             schema: z
               .object({
-                name: z.string().optional(),
+                name: z.string().optional().openapi({
+                  description: 'Nuevo nombre del usuario',
+                  example: 'Juan Pérez'
+                }),
               })
               .openapi('UpdateUserBody'),
+            example: {
+              name: 'Juan Pérez'
+            }
           },
         },
       },
     },
     responses: {
-      200: { description: 'Usuario actualizado' },
-      400: { description: 'Datos inválidos o sin cambios' },
-      401: { description: 'No autenticado' },
-      403: { description: 'No autorizado' },
-      404: { description: 'Usuario no encontrado' },
+      200: {
+        description: 'Usuario actualizado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              _id: '675a1fa2923d2bd1e4cd9f12',
+              email: 'user@example.com',
+              name: 'Juan Pérez',
+              avatar: 'https://api.dicebear.com/7.x/thumbs/svg?...',
+              plan: 'FREE',
+              addons: [],
+              updatedAt: '2024-12-10T12:00:00.000Z'
+            }
+          }
+        }
+      },
+      400: {
+        description: 'Datos inválidos o sin cambios',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'No hay campos para actualizar'
+            }
+          }
+        }
+      },
+      401: {
+        description: 'No autenticado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Unauthorized'
+            }
+          }
+        }
+      },
+      403: {
+        description: 'No autorizado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Forbidden'
+            }
+          }
+        }
+      },
+      404: {
+        description: 'Usuario no encontrado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Usuario no encontrado'
+            }
+          }
+        }
+      },
     },
   },
   async (c) => {
@@ -372,18 +487,81 @@ usersRoute.openapi(
     method: 'delete',
     path: '/{id}',
     summary: 'Eliminar usuario logueado',
+    description: `
+      Elimina definitivamente al usuario autenticado.
+
+      Restricciones:
+      - Requiere autenticación JWT
+      - Solo el propio usuario puede eliminar su cuenta
+      - El ID debe ser un ObjectId válido
+      - La operación es irreversible
+    `,
+    tags: ['Users'],
     security: [{ bearerAuth: [] }],
     request: {
       params: z.object({
-        id: z.string().openapi({ description: 'ID del usuario' }),
+        id: z.string().openapi({
+          description: 'ID del usuario',
+          example: '675a1fa2923d2bd1e4cd9f12'
+        }),
       }),
     },
     responses: {
-      200: { description: 'Usuario eliminado' },
-      400: { description: 'ID no válido' },
-      401: { description: 'No autenticado' },
-      403: { description: 'No autorizado' },
-      404: { description: 'Usuario no encontrado' },
+      200: {
+        description: 'Usuario eliminado correctamente',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              success: true
+            }
+          }
+        }
+      },
+      400: {
+        description: 'ID no válido',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'ID no válido'
+            }
+          }
+        }
+      },
+      401: {
+        description: 'No autenticado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Unauthorized'
+            }
+          }
+        }
+      },
+      403: {
+        description: 'No autorizado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Forbidden'
+            }
+          }
+        }
+      },
+      404: {
+        description: 'Usuario no encontrado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Usuario no encontrado'
+            }
+          }
+        }
+      },
     },
   },
   async (c) => {
@@ -412,11 +590,60 @@ usersRoute.openapi(
     method: 'get',
     path: '/me/plan',
     summary: 'Obtener plan y add-ons del usuario actual',
+    description: `
+      Devuelve el plan de precios y los add-ons activos del usuario autenticado.
+
+      Características:
+      - Requiere autenticación JWT
+      - La información se obtiene a partir del usuario identificado en el token
+      - Se utiliza para adaptar la funcionalidad según el plan contratado
+    `,
+    tags: ['Plans'],
     security: [{ bearerAuth: [] }],
     responses: {
-      200: { description: 'Plan y add-ons' },
-      401: { description: 'No autenticado' },
-      404: { description: 'Usuario no encontrado' },
+      200: {
+        description: 'Plan y add-ons del usuario',
+        content: {
+          'application/json': {
+            schema: z.object({
+              plan: z.string().openapi({
+                description: 'Plan de precios del usuario',
+                example: 'FREE'
+              }),
+              addons: z.array(z.string()).openapi({
+                description: 'Lista de add-ons activos',
+                example: ['analytics', 'priority-support']
+              })
+            }),
+            example: {
+              plan: 'PRO',
+              addons: ['analytics']
+            }
+          }
+        }
+      },
+      401: {
+        description: 'No autenticado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Unauthorized'
+            }
+          }
+        }
+      },
+      404: {
+        description: 'Usuario no encontrado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Usuario no encontrado'
+            }
+          }
+        }
+      },
     },
   },
   async (c) => {
@@ -443,6 +670,16 @@ usersRoute.openapi(
     method: 'patch',
     path: '/{id}/plan',
     summary: 'Cambiar plan del usuario logueado',
+    description: `
+      Permite cambiar el plan de precios del usuario autenticado.
+
+      Restricciones:
+      - Requiere autenticación JWT
+      - Solo el propio usuario puede cambiar su plan
+      - El plan debe ser uno de los valores permitidos
+      - El ID debe ser un ObjectId válido
+    `,
+    tags: ['Plans'],
     security: [{ bearerAuth: [] }],
     request: {
       params: z.object({
@@ -453,19 +690,81 @@ usersRoute.openapi(
           'application/json': {
             schema: z
               .object({
-                plan: z.enum(ALLOWED_PLANS),
+                plan: z.enum(ALLOWED_PLANS).openapi({
+                  description: 'Nuevo plan de precios del usuario',
+                  example: 'PRO'
+                }),
               })
               .openapi('UpdatePlanBody'),
+            example: {
+              plan: 'PRO'
+            }
           },
         },
       },
     },
     responses: {
-      200: { description: 'Plan actualizado' },
-      400: { description: 'Plan inválido' },
-      401: { description: 'No autenticado' },
-      403: { description: 'No autorizado' },
-      404: { description: 'Usuario no encontrado' },
+      200: {
+        description: 'Plan actualizado correctamente',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              _id: '675a1fa2923d2bd1e4cd9f12',
+              email: 'user@example.com',
+              name: 'Juan Pérez',
+              avatar: 'https://api.dicebear.com/7.x/thumbs/svg?...',
+              plan: 'PRO',
+              addons: [],
+              updatedAt: '2024-12-10T12:00:00.000Z'
+            }
+          }
+        }
+      },
+      400: {
+        description: 'Plan inválido',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Plan no válido. Debe ser uno de: FREE, PRO, ENTERPRISE'
+            }
+          }
+        }
+      },
+      401: {
+        description: 'No autenticado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Unauthorized'
+            }
+          }
+        }
+      },
+      403: {
+        description: 'No autorizado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Forbidden'
+            }
+          }
+        }
+      },
+      404: {
+        description: 'Usuario no encontrado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Usuario no encontrado'
+            }
+          }
+        }
+      },
     },
   },
   async (c) => {
@@ -505,29 +804,103 @@ usersRoute.openapi(
     method: 'patch',
     path: '/{id}/addons',
     summary: 'Actualizar add-ons del usuario logueado',
+    description: `
+      Permite actualizar la lista de add-ons activos del usuario autenticado.
+
+      Restricciones:
+      - Requiere autenticación JWT
+      - Solo el propio usuario puede modificar sus add-ons
+      - El ID debe ser un ObjectId válido
+    `,
+    tags: ['Plans'],
     security: [{ bearerAuth: [] }],
     request: {
       params: z.object({
-        id: z.string().openapi({ description: 'ID del usuario' }),
+        id: z.string().openapi({
+          description: 'ID del usuario',
+          example: '675a1fa2923d2bd1e4cd9f12'
+        }),
       }),
       body: {
         content: {
           'application/json': {
             schema: z
               .object({
-                addons: z.array(z.string()),
+                addons: z.array(z.string()).openapi({
+                  description: 'Lista de add-ons activos',
+                  example: ['analytics', 'priority-support']
+                }),
               })
               .openapi('UpdateAddonsBody'),
+            example: {
+              addons: ['analytics', 'priority-support']
+            }
           },
         },
       },
     },
     responses: {
-      200: { description: 'Add-ons actualizados' },
-      400: { description: 'Datos inválidos' },
-      401: { description: 'No autenticado' },
-      403: { description: 'No autorizado' },
-      404: { description: 'Usuario no encontrado' },
+      200: {
+        description: 'Add-ons actualizados correctamente',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              _id: '675a1fa2923d2bd1e4cd9f12',
+              email: 'user@example.com',
+              name: 'Juan Pérez',
+              avatar: 'https://api.dicebear.com/7.x/thumbs/svg?...',
+              plan: 'PRO',
+              addons: ['analytics', 'priority-support'],
+              updatedAt: '2024-12-10T12:00:00.000Z'
+            }
+          }
+        }
+      },
+      400: {
+        description: 'Datos inválidos',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'addons debe ser un array de strings'
+            }
+          }
+        }
+      },
+      401: {
+        description: 'No autenticado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Unauthorized'
+            }
+          }
+        }
+      },
+      403: {
+        description: 'No autorizado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Forbidden'
+            }
+          }
+        }
+      },
+      404: {
+        description: 'Usuario no encontrado',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Usuario no encontrado'
+            }
+          }
+        }
+      },
     },
   },
   async (c) => {
@@ -566,17 +939,82 @@ usersRoute.openapi(
     method: "patch",
     path: "/{id}/avatar",
     summary: "Subir avatar del usuario",
+    description: `
+      Permite subir o actualizar el avatar del usuario autenticado.
+
+      Características:
+      - Requiere autenticación JWT
+      - El archivo se almacena en Supabase Storage
+      - Tamaño máximo permitido: 1MB
+      - Tipos permitidos: JPG, JPEG, PNG, WEBP, AVIF
+      - La URL pública del avatar se guarda en MongoDB
+    `,
+    tags: ["Users"],
     security: [{ bearerAuth: [] }],
     request: {
       params: z.object({
-        id: z.string(),
-      })
+        id: z.string().openapi({
+          description: "ID del usuario",
+          example: "675a1fa2923d2bd1e4cd9f12"
+        }),
+      }),
+      body: {
+        content: {
+          "multipart/form-data": {
+            schema: z.object({
+              avatar: z.any().openapi({
+                description: "Archivo de imagen del avatar"
+              })
+            }),
+          },
+        },
+      },
     },
     responses: {
-      200: { description: "Avatar actualizado" },
-      400: { description: "Archivo inválido o demasiado grande (máx 1MB). Solo JPG, PNG o WEBP." },
-      403: { description: "No autorizado" },
-      500: { description: "Error en servidor o Supabase" }
+      200: {
+        description: "Avatar actualizado correctamente",
+        content: {
+          "application/json": {
+            schema: z.any(),
+            example: {
+              avatar: "https://project.supabase.co/storage/v1/object/public/avatars/675a1fa2923d2bd1e4cd9f12-1700000000"
+            }
+          }
+        }
+      },
+      400: {
+        description: "Archivo inválido o demasiado grande",
+        content: {
+          "application/json": {
+            schema: z.any(),
+            example: {
+              error: "Extensión de imagen no válida o el archivo es demasiado grande. Máximo 1MB. Extensiones permitidas: jpg, jpeg, png, webp, avif."
+            }
+          }
+        }
+      },
+      403: {
+        description: "No autorizado",
+        content: {
+          "application/json": {
+            schema: z.any(),
+            example: {
+              error: "Forbidden"
+            }
+          }
+        }
+      },
+      500: {
+        description: "Error en servidor o Supabase",
+        content: {
+          "application/json": {
+            schema: z.any(),
+            example: {
+              error: "Error al subir avatar"
+            }
+          }
+        }
+      }
     }
   },
   async (c) => {
@@ -639,4 +1077,3 @@ usersRoute.openapi(
     return c.json({ avatar: publicUrl });
   }
 );
-

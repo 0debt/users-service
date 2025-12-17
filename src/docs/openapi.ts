@@ -28,7 +28,7 @@ api.doc('/openapi.json', {
     title: 'Users Service API',
     version: '1.0.0',
     description: `
-      API REST del microservicio de **usuarios** de la aplicación 0debt.
+      API REST del microservicio de usuarios de la aplicación 0debt.
 
       Este microservicio es responsable de:
       - Registro y autenticación de usuarios
@@ -62,10 +62,6 @@ api.doc('/openapi.json', {
     {
       name: 'Plans',
       description: 'Gestión de planes y suscripciones',
-    },
-    {
-      name: 'Health',
-      description: 'Comprobación del estado del servicio',
     },
   ],
 })
