@@ -6,6 +6,8 @@ import type { AppEnv, JwtUserPayload } from '../types/app'
 import { redis } from '../lib/redis'
 import { supabase } from "../lib/supabase";
 import { BadRequestResponse, UnauthorizedResponse, ForbiddenResponse, NotFoundResponse } from '../schemas/errors'
+import { requirePlan } from '../middleware/requirePlan'
+
 
 // Planes permitidos
 const ALLOWED_PLANS = ['FREE', 'PRO', 'ENTERPRISE'] as const
@@ -20,6 +22,7 @@ const UserPublicSchema = z.object({
   avatar: z.string().url(),
   plan: z.string()
 }).openapi('UserPublic')
+
 
 // GET /api/v1/internal/users/:id
 usersRoute.openapi(
@@ -710,13 +713,16 @@ usersRoute.openapi(
           'application/json': {
             schema: z.any(),
             example: {
-              _id: '675a1fa2923d2bd1e4cd9f12',
-              email: 'user@example.com',
-              name: 'Juan Pérez',
-              avatar: 'https://api.dicebear.com/7.x/thumbs/svg?...',
-              plan: 'PRO',
-              addons: [],
-              updatedAt: '2024-12-10T12:00:00.000Z'
+              message: 'Plan actualizado. Vuelve a iniciar sesión para aplicar los cambios.',
+              user: {
+                _id: '675a1fa2923d2bd1e4cd9f12',
+                email: 'user@example.com',
+                name: 'Juan Pérez',
+                avatar: 'https://api.dicebear.com/7.x/thumbs/svg?...',
+                plan: 'PRO',
+                addons: [],
+                updatedAt: '2024-12-10T12:00:00.000Z'
+              }
             }
           }
         }
@@ -794,7 +800,10 @@ usersRoute.openapi(
 
     if (!result) return c.json({ error: 'Usuario no encontrado' }, 404)
 
-    return c.json(result)
+    return c.json({
+      message: 'Plan actualizado. Vuelve a iniciar sesión para aplicar los cambios.',
+      user: result
+    })
   }
 )
 
@@ -933,6 +942,11 @@ usersRoute.openapi(
 const MAX_FILE_SIZE = 1 * 1024 * 1024 // 1MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/jpg"]
 
+usersRoute.use(
+  '/:id/avatar',
+  requirePlan(["PRO", "ENTERPRISE"])
+)
+
 // PATCH /api/v1/users/:id/avatar
 usersRoute.openapi(
   {
@@ -941,6 +955,8 @@ usersRoute.openapi(
     summary: "Subir avatar del usuario",
     description: `
       Permite subir o actualizar el avatar del usuario autenticado.
+
+      Funcionalidad disponible solo para usuarios con plan PRO o ENTERPRISE.
 
       Características:
       - Requiere autenticación JWT

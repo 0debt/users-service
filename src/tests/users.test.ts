@@ -109,7 +109,7 @@ describe('Users endpoints', () => {
     })
     expect(resPlan.status).toBe(200)
     const updatedPlanUser = await resPlan.json()
-    expect(updatedPlanUser.plan).toBe('PRO')
+    expect(updatedPlanUser.user.plan).toBe('PRO')
 
     // Cambiar addons
     const addons = ['extra-storage', 'priority-support']
@@ -199,5 +199,47 @@ describe('Users endpoints', () => {
     })
 
     expect(res.status).toBe(400)
+  })
+
+  it('Usuario FREE no puede subir avatar (feature toggle por plan)', async () => {
+    const { token, id } = await registerAndLogin()
+
+    // Intentar subir avatar siendo FREE
+    const res = await app.request(`/api/v1/users/${id}/avatar`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: (() => {
+        const form = new FormData()
+        const file = new File(
+          [Buffer.from('fake-image-content')],
+          'avatar.png',
+          { type: 'image/png' }
+        )
+        form.append('avatar', file)
+        return form
+      })(),
+    })
+
+    expect(res.status).toBe(403)
+    const body = await res.json()
+    expect(body.error).toContain('plan')
+  })
+
+  it('Informa que es necesario relogin tras cambiar el plan', async () => {
+    const { token, id } = await registerAndLogin()
+
+    const res = await app.request(`/api/v1/users/${id}/plan`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ plan: 'PRO' }),
+    })
+
+    const body = await res.json()
+    expect(body.message).toContain('iniciar sesión')
   })
 })
