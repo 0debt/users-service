@@ -107,6 +107,47 @@ usersRoute.openapi(
   }
 )
 
+// GET /api/v1/internal/search - Search user by email (internal use)
+usersRoute.openapi(
+  {
+    method: 'get',
+    path: '/internal/search',
+    summary: 'Search user by email (internal use)',
+    description: 'Endpoint used by other microservices to resolve emails to user IDs.',
+    tags: ['Internal'],
+    request: {
+      query: z.object({
+        email: z.string().email().openapi({ description: 'Email to search' })
+      })
+    },
+    responses: {
+      200: {
+        description: 'User found',
+        content: {
+          'application/json': {
+            schema: z.object({
+              id: z.string()
+            })
+          }
+        }
+      },
+      404: NotFoundResponse
+    }
+  },
+  async (c) => {
+    const email = c.req.query('email')
+    if (!email) return c.json({ error: 'Email required' }, 400)
+
+    const users = getUsersCollection()
+    // Projection: only need _id
+    const user = await users.findOne({ email }, { projection: { _id: 1 } })
+
+    if (!user) return c.json({ error: 'User not found' }, 404)
+
+    return c.json({ id: String(user._id) })
+  }
+)
+
 // Todas las rutas requieren autenticación
 usersRoute.use('*', authMiddleware)
 
