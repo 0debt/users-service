@@ -530,14 +530,20 @@ usersRoute.openapi(
   {
     method: 'delete',
     path: '/{id}',
-    summary: 'Eliminar usuario logueado',
+    summary: 'Eliminar usuario logueado (Orquestación SAGA)',
     description: `
-      Elimina definitivamente al usuario autenticado.
+      Elimina definitivamente al usuario autenticado mediante orquestación SAGA.
+
+      Flujo SAGA:
+      1. **Validación con expenses-service**: Verifica que el usuario no tenga deudas o gastos pendientes
+      2. **Borrado local**: Elimina el usuario de MongoDB
+      3. **Limpieza analytics-service**: Solicita eliminación de datos analíticos (best-effort)
 
       Restricciones:
       - Requiere autenticación JWT
       - Solo el propio usuario puede eliminar su cuenta
       - El ID debe ser un ObjectId válido
+      - No se permite eliminar si hay deudas pendientes
       - La operación es irreversible
     `,
     tags: ['Users'],
@@ -606,6 +612,28 @@ usersRoute.openapi(
           }
         }
       },
+      409: {
+        description: 'Conflicto - Usuario tiene deudas o gastos pendientes',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'No puedes borrar tu cuenta mientras tengas deudas o gastos activos.'
+            }
+          }
+        }
+      },
+      500: {
+        description: 'Error interno del servidor',
+        content: {
+          'application/json': {
+            schema: z.any(),
+            example: {
+              error: 'Error verificando estado financiero. Inténtalo más tarde.'
+            }
+          }
+        }
+      },
     },
   },
   async (c) => {
@@ -618,11 +646,54 @@ usersRoute.openapi(
     if (userFromToken.sub !== id)
       return c.json({ error: 'Forbidden' }, 403)
 
+    // ============================================
+    // SAGA PASO 1: Validación con expenses-service
+    // ============================================
+    const expensesUrl = process.env.EXPENSES_SERVICE_URL || 'http://expenses-service:3000'
+    try {
+      const debtRes = await fetch(`${expensesUrl}/api/v1/internal/users/${id}/debtStatus`)
+      if (debtRes.ok) {
+        const { data } = await debtRes.json() as { data: { canDelete: boolean } }
+        if (!data.canDelete) {
+          return c.json({ error: 'No puedes borrar tu cuenta mientras tengas deudas o gastos activos.' }, 409)
+        }
+      } else if (debtRes.status !== 404) {
+        // Si no es 404 (usuario sin gastos), tratar como error
+        console.error(`[SAGA] expenses-service respondió con status ${debtRes.status}`)
+        return c.json({ error: 'Error verificando estado financiero. Inténtalo más tarde.' }, 500)
+      }
+      // Si es 404, el usuario no tiene gastos registrados -> puede borrar
+    } catch (err) {
+      console.error('[SAGA] Error contactando expenses-service:', err)
+      // Por seguridad financiera: NO dejamos borrar si no podemos verificar
+      return c.json({ error: 'Error verificando estado financiero. Inténtalo más tarde.' }, 500)
+    }
+
+    // ============================================
+    // SAGA PASO 2: Borrado Local (MongoDB)
+    // ============================================
     const users = getUsersCollection()
     const result = await users.deleteOne({ _id: new ObjectId(id) })
 
     if (result.deletedCount === 0)
       return c.json({ error: 'Usuario no encontrado' }, 404)
+
+    // ============================================
+    // SAGA PASO 3: Limpieza analytics-service (Fire and Forget)
+    // ============================================
+    const analyticsUrl = process.env.ANALYTICS_SERVICE_URL || 'http://analytics-service:3000'
+    // No bloqueamos la respuesta - ejecutamos en background
+    fetch(`${analyticsUrl}/v1/internal/users/${id}`, { method: 'DELETE' })
+      .then(res => {
+        if (!res.ok) {
+          console.error(`[SAGA][Consistency Alert] analytics-service respondió con status ${res.status} al limpiar usuario ${id}`)
+        } else {
+          console.log(`[SAGA] Datos analíticos del usuario ${id} eliminados correctamente`)
+        }
+      })
+      .catch(err => {
+        console.error(`[SAGA][Consistency Alert] Fallo limpieza analytics para usuario ${id}:`, err)
+      })
 
     return c.json({ success: true })
   }
