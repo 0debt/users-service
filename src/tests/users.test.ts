@@ -1,8 +1,41 @@
-import { describe, it, expect } from 'bun:test'
+import { describe, it, expect, mock, beforeAll, afterAll } from 'bun:test'
 import { app } from '../../src/index'
 
 const randomEmail = () => `user_${Date.now()}_${Math.random()}@example.com`
 const PASSWORD = '123456'
+
+// Store original fetch
+const originalFetch = globalThis.fetch
+
+// Mock fetch for external services (expenses-service, analytics-service)
+beforeAll(() => {
+  globalThis.fetch = mock((url: string, options?: RequestInit) => {
+    const urlStr = url.toString()
+    
+    // Mock expenses-service debtStatus endpoint
+    if (urlStr.includes('/api/v1/internal/users/') && urlStr.includes('/debtStatus')) {
+      return Promise.resolve(new Response(
+        JSON.stringify({ data: { canDelete: true } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ))
+    }
+    
+    // Mock analytics-service cleanup endpoint
+    if (urlStr.includes('/v1/internal/users/') && options?.method === 'DELETE') {
+      return Promise.resolve(new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ))
+    }
+    
+    // For all other requests, use original fetch
+    return originalFetch(url, options)
+  }) as typeof fetch
+})
+
+afterAll(() => {
+  globalThis.fetch = originalFetch
+})
 
 async function registerAndLogin() {
   const email = randomEmail()
