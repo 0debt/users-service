@@ -618,7 +618,7 @@ usersRoute.openapi(
           'application/json': {
             schema: z.any(),
             example: {
-              error: 'No puedes borrar tu cuenta mientras tengas deudas o gastos activos.'
+              error: 'You can’t delete your account while you have outstanding debts or active charges.'
             }
           }
         }
@@ -629,7 +629,7 @@ usersRoute.openapi(
           'application/json': {
             schema: z.any(),
             example: {
-              error: 'Error verificando estado financiero. Inténtalo más tarde.'
+              error: 'Error checking financial status. Please try again later.'
             }
           }
         }
