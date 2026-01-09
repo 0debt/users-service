@@ -322,3 +322,7 @@ users-service/
 - **Enforced by**: `requirePlan` middleware
 - **Behavior**: Same endpoint, different behavior at runtime
 
+---
+
+## Use of AI
+Artificial Intelligence tools were used as a support resource during the development of the users-service, mainly to assist with code review, clarification of architectural and resilience patterns (such as JWT authentication, caching, throttling, and circuit breakers), and to improve the quality and clarity of the technical documentation. AI was also used to help define and reason about test scenarios, particularly for negative and edge cases. All design decisions, implementations, and validations were carried out by the development team, with AI acting solely as an auxiliary tool and not as a replacement for developer responsibility.
