@@ -655,7 +655,7 @@ usersRoute.openapi(
       if (debtRes.ok) {
         const { data } = await debtRes.json() as { data: { canDelete: boolean } }
         if (!data.canDelete) {
-          return c.json({ error: 'No puedes borrar tu cuenta mientras tengas deudas o gastos activos.' }, 409)
+          return c.json({ error: 'You can’t delete your account while you have outstanding debts or active charges.' }, 409)
         }
       } else if (debtRes.status !== 404) {
         // Si no es 404 (usuario sin gastos), tratar como error
@@ -666,7 +666,7 @@ usersRoute.openapi(
     } catch (err) {
       console.error('[SAGA] Error contactando expenses-service:', err)
       // Por seguridad financiera: NO dejamos borrar si no podemos verificar
-      return c.json({ error: 'Error verificando estado financiero. Inténtalo más tarde.' }, 500)
+      return c.json({ error: 'Error checking financial status. Please try again later.' }, 500)
     }
 
     // ============================================
